@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/jessevdk/go-flags"
 	"os"
+	"time"
 )
 
 const (
@@ -50,5 +54,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Hello World")
+	if opts.Region == "" {
+		opts.Region = "us-east-1"
+	}
+
+	fmt.Println("REGION = ", opts.Region)
+
+	//initial := getCredentials(opts.Profile)
+	role := "arn:aws:iam::380482008503:role/bootcamp/assumer_target"
+	creds := credentials.NewCredentials(&stscreds.AssumeRoleProvider{
+		Client:       sts.New(session.New()),
+		Duration:     time.Hour,
+		RoleARN:      role,
+		ExpiryWindow: 5 * time.Minute,
+	})
+	fmt.Println(creds)
 }
