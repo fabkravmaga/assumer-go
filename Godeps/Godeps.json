@@ -1,0 +1,14 @@
+{
+	"ImportPath": "github.com/ccloes-intuit/assumer-go",
+	"GoVersion": "go1.6",
+	"Packages": [
+		"./assumer/..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/jessevdk/go-flags",
+			"Comment": "v1-347-gf2785f5",
+			"Rev": "f2785f5820ec967043de79c8be97edfc464ca745"
+		}
+	]
+}
