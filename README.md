@@ -28,7 +28,7 @@ Assumer will assume-role on a target account and generate temporary API keys for
   * `make`
 
 ## Options
-`
+```
 Usage:
   assumer [OPTIONS]
 
@@ -47,11 +47,10 @@ Application Options:
 Help Options:
   -h, --help             Show this help message
 
-`
+```
 
 ## Example build
-
-`
+```
 [15:54][ccloes@wdhl07e9fbdff:~/go/src/github.com/ccloes-intuit/assumer-go][ git:(upstream ⚡ initial)]$ ./build
 GO ROOT: 
 
@@ -70,7 +69,7 @@ Creating artifact assumer-0.0.1-windows-amd64.tgz...
 Done
 
 Complete
-`
+```
 
 ## Usage ##
 
