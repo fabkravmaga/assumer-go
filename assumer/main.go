@@ -4,50 +4,13 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/jessevdk/go-flags"
 	"os"
-	"time"
 )
-
-const (
-	version = "0.0.1"
-)
-
-type options struct {
-	TargetAccount  string `short:"a" long:"target-account" description:"Target AWS account to assume into"`
-	TargetRole     bool   `short:"r" long:"target-role" description:"The role in the target account"`
-	ControlAccount string `short:"A" long:"control-account" description:"Control Plane AWS account"`
-	ControlRole    string `short:"R" long:"control-role" description:"The role in the control account"`
-	Region         string `short:"e" long:"region" description:"AWS region to operate in (default: us-east-1)"`
-	Username       string `short:"u" long:"username" description:"Your IAM username"`
-	Profile        string `short:"o" long:"profile" description:"Profile name from ~/.aws/credentials"`
-	GUI            string `short:"g" long:"gui" description:"Open a web browser to the AWS console with these credentials"`
-	Pry            string `short:"p" long:"pry" description:"Open a pry shell with these credentials"`
-	Debug          string `short:"d" long:"debug" description:"Output debugging information"`
-	Version        bool   `short:"v" long:"version" description:"Print the Version of the CLI"`
-}
-
-func getCredentials(profile string, region string) *aws.Config {
-	creds := credentials.NewSharedCredentials("", profile)
-	return aws.NewConfig().WithCredentials(creds).WithRegion(region)
-}
-
-func parseArgs() *options {
-	opts := &options{}
-	parser := flags.NewParser(opts, flags.Default)
-	_, err := parser.Parse()
-	if err != nil {
-		fmt.Println("Error parsing command line args")
-		os.Exit(1)
-	}
-	return opts
-}
 
 func main() {
-
+	var mfa string
+	var err error
 	opts := parseArgs()
 	if opts.Version {
 		fmt.Println("VERSION = ", version)
@@ -58,15 +21,34 @@ func main() {
 		opts.Region = "us-east-1"
 	}
 
-	fmt.Println("REGION = ", opts.Region)
+	serial, err := getSerial(opts.Username, opts.ControlAccount)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	controlRole := getCompositeRole(opts.ControlRole, opts.ControlAccount)
+	targetRole := getCompositeRole(opts.TargetRole, opts.TargetAccount)
+	fmt.Println(targetRole + "\nvia\n" + controlRole)
 
-	//initial := getCredentials(opts.Profile)
-	role := "arn:aws:iam::380482008503:role/bootcamp/assumer_target"
-	creds := credentials.NewCredentials(&stscreds.AssumeRoleProvider{
-		Client:       sts.New(session.New()),
-		Duration:     time.Hour,
-		RoleARN:      role,
-		ExpiryWindow: 5 * time.Minute,
-	})
-	fmt.Println(creds)
+	if opts.MFA == "" {
+		mfa, err = getMFA()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	} else {
+		mfa = opts.MFA
+	}
+
+	creds := credentials.NewSharedCredentials("", opts.Profile)
+	config := aws.NewConfig().WithCredentials(creds).WithRegion(opts.Region)
+	sess := session.New(config)
+
+	controlCreds, err := getControlCreds(opts.ControlAccount, controlRole, serial, mfa, sess)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	getTempCreds(opts.TargetAccount, targetRole, controlCreds, opts.Region)
 }
