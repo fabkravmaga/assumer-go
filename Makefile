@@ -5,7 +5,7 @@ all: clean compile test
 binaries:
 	@echo "==> Building binaries $(COMPILE_VERSION)"
 	@rm -fr ./pkg
-	@for os in linux darwin; do \
+	@for os in linux darwin windows; do \
 		echo "----> Building $$os binary"; \
 		mkdir -p ./pkg/$$os; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=amd64 go build -ldflags $(LDFLAGS) -o ./pkg/$$os/assumer ./assumer; \

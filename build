@@ -1,0 +1,114 @@
+#!/bin/bash
+
+function create_artifact() {
+  for os in $(ls ${workspace_tmp}/artifact); do
+    artifact_file="${artifact_id}-${compile_version}-${os}-${os_arch}${suffix}.${ext}"
+    artifact_file_path="${workspace_tmp}/artifact/${artifact_file}"
+    cp ${build_path}/README.md "${workspace_tmp}/artifact/${os}/"
+    echo "Creating artifact ${artifact_file}..."
+    tar czf "${artifact_file_path}" -C "${workspace_tmp}/artifact/${os}/" .
+  done
+  echo "Done"
+}
+
+function get_version() {
+    if is_tag; then
+        echo "$(git tag --points-at ${commit})"
+    else
+        echo "${commit}"
+    fi
+}
+
+function is_tag() {
+    set +e
+    v=$(git tag --points-at ${commit})
+    if [ $? -ne 0 ]; then
+        set -e
+        echo "Unable to determine if this commit is a tag."
+        exit 1
+    elif [[ ${v} == "" ]]; then
+        set -e
+        return 1
+    else
+        set -e
+        return 0
+    fi
+}
+
+function populate_artifact() {
+  rm -fr ${workspace_tmp}/artifact
+  mv ${build_path}/pkg ${workspace_tmp}/artifact
+}
+
+function setup_build_directory() {
+  rm -rf ${build_path}
+  mkdir -p ${build_path}
+  cp -R assumer ${build_path}/assumer
+  cp -R vendor ${build_path}
+  cp README.md ${build_path}
+  cp Makefile ${build_path}
+  cp -R Godeps ${build_path}
+}
+
+function get_cli_version {
+  grep version assumer/config.go | head -1 | cut -d \= -f 2 | sed -e 's/"//g' | sed -e 's/ //'
+}
+
+commit=$(git rev-parse HEAD)
+
+artifact_id="assumer"
+ext="tgz"
+os_arch="amd64"
+workspace="$(pwd)"
+workspace_tmp="${workspace}/tmp"
+org_path="${workspace}/go/src/github.com/devsecops"
+build_path="${org_path}/$artifact_id"
+version="$(get_version)"
+artifact_file="${artifact_id}-${version}.${ext}"
+
+
+# get script dir
+script_source="${BASH_SOURCE[0]}"
+while [ -h "$script_source" ] ; do script_source="$(readlink "$script_source")"; done
+root_dir="$( cd -P "$( dirname "$script_source" )/" && pwd )"
+deployment_artifact_path="${workspace_tmp}/${artifact_id}"
+
+rm -rf ${workspace_tmp}
+mkdir -p ${workspace_tmp}
+mkdir -p $deployment_artifact_path
+
+# only in ci env
+set +u
+if [ ! -z "$BUILD_ID" ]; then
+  set -u
+  setup_build_directory
+  cd $build_path
+  set_branch_suffix
+else
+  build_path=${workspace}
+fi
+
+echo "GO ROOT: ${GOROOT}"
+echo ""
+
+cli_version=$(get_cli_version)
+scm_version=$(get_version)
+
+if is_tag; then
+  compile_version="${cli_version}"
+else
+  compile_version="${cli_version}-${commit}"
+fi
+
+## Compile and test on Linux
+cd $build_path
+make test
+COMPILE_VERSION=${compile_version} make binaries
+echo ""
+
+populate_artifact
+cd ${workspace}
+create_artifact
+
+echo ""
+echo "Complete"
